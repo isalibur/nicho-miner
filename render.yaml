@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: nicho-miner
+    runtime: docker
+    plan: free
+    envVars:
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: API_TOKEN
+        sync: false
+    healthCheckPath: /niches

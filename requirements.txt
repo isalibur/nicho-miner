@@ -1,0 +1,12 @@
+aiohttp
+pandas
+fastapi
+uvicorn
+python-dotenv
+pytest
+pytest-asyncio
+streamlit
+flake8
+black
+apscheduler
+apscheduler

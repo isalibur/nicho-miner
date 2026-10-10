@@ -1,0 +1,6 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "sh -c 'python scripts/scheduler.py & uvicorn src.api.main:app --host 0.0.0.0 --port $PORT'"
+healthcheckPath = "/niches"

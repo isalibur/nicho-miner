@@ -1,0 +1,52 @@
+[
+  {
+    "keyword": "official",
+    "frequency": 100,
+    "weight": 0.0194
+  },
+  {
+    "keyword": "trailer",
+    "frequency": 90,
+    "weight": 0.0174
+  },
+  {
+    "keyword": "toilet",
+    "frequency": 51,
+    "weight": 0.0099
+  },
+  {
+    "keyword": "troye",
+    "frequency": 51,
+    "weight": 0.0099
+  },
+  {
+    "keyword": "skibidi",
+    "frequency": 50,
+    "weight": 0.0097
+  },
+  {
+    "keyword": "sivan",
+    "frequency": 50,
+    "weight": 0.0097
+  },
+  {
+    "keyword": "bulin",
+    "frequency": 49,
+    "weight": 0.0095
+  },
+  {
+    "keyword": "you",
+    "frequency": 47,
+    "weight": 0.0091
+  },
+  {
+    "keyword": "minecraft",
+    "frequency": 46,
+    "weight": 0.0089
+  },
+  {
+    "keyword": "oficial",
+    "frequency": 43,
+    "weight": 0.0083
+  }
+]
