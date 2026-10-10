@@ -127,3 +127,72 @@ def get_keywords(limit: int = 10) -> list[dict]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def search_niches(query: str, limit: int = 20) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM niches WHERE niche LIKE ? OR channel LIKE ? ORDER BY anomaly_score DESC LIMIT ?",
+        (f"%{query}%", f"%{query}%", limit)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def search_anomalies(query: str, limit: int = 50) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM anomalies WHERE title LIKE ? OR channel_title LIKE ? ORDER BY anomaly_score DESC LIMIT ?",
+        (f"%{query}%", f"%{query}%", limit)
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["is_viral"] = bool(d["is_viral"])
+        d["is_fast_growth"] = bool(d["is_fast_growth"])
+        d["is_low_competition"] = bool(d["is_low_competition"])
+        d["channel_url"] = f"https://youtube.com/channel/{d['channel_id']}"
+        result.append(d)
+    return result
+
+
+def search_keywords(query: str, limit: int = 10) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM keywords WHERE keyword LIKE ? ORDER BY frequency DESC LIMIT ?",
+        (f"%{query}%", limit)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_niches_with_url(limit: int = 20) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM niches ORDER BY anomaly_score DESC, avg_views DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["channel_url"] = f"https://youtube.com/@{d['channel'].replace(' ', '')}" if d.get('channel') else ""
+        result.append(d)
+    return result
+
+
+def get_anomalies_with_url(limit: int = 50) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM anomalies ORDER BY anomaly_score DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["is_viral"] = bool(d["is_viral"])
+        d["is_fast_growth"] = bool(d["is_fast_growth"])
+        d["is_low_competition"] = bool(d["is_low_competition"])
+        d["channel_url"] = f"https://youtube.com/channel/{d['channel_id']}"
+        result.append(d)
+    return result

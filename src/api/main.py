@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, Query
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 import time
 import os
-from src.db import init_db, get_niches, get_anomalies, get_keywords
+from src.db import (
+    init_db, get_niches, get_anomalies, get_keywords,
+    search_niches, search_anomalies, search_keywords,
+    get_niches_with_url, get_anomalies_with_url,
+)
 
 app = FastAPI(title="Minerador de Nichos API", version="2.0")
 
@@ -70,6 +74,12 @@ async def root():
         .status-dot { width: 8px; height: 8px; background: #00ff00; border-radius: 50%; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-input { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #333; background: #1a1a1a; color: #fff; font-size: 14px; outline: none; }
+        .search-input:focus { border-color: #ff0000; }
+        .search-input::placeholder { color: #666; }
+        .channel-link { color: #ff0000; text-decoration: none; }
+        .channel-link:hover { text-decoration: underline; }
         .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #333; }
         .tab { padding: 12px 24px; cursor: pointer; border: none; background: transparent; color: #aaa; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
         .tab:hover { color: #fff; }
@@ -114,6 +124,11 @@ async def root():
     </div>
 
     <div class="container">
+        <div class="search-bar">
+            <input type="text" class="search-input" id="search-input" placeholder="Buscar por termo, nicho ou canal..." onkeyup="handleSearch(event)">
+            <button class="btn btn-primary" onclick="performSearch()">Buscar</button>
+        </div>
+
         <div class="stats">
             <div class="stat-card">
                 <div class="stat-value" id="stat-niches">-</div>
@@ -178,23 +193,40 @@ async def root():
     <script>
         const API_TOKEN = 'dev-token-12345';
         const API_URL = window.location.origin;
+        let currentTab = 'niches';
 
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById('tab-' + tab).classList.add('active');
-            if (tab === 'niches') loadNiches();
-            if (tab === 'anomalies') loadAnomalies();
-            if (tab === 'keywords') loadKeywords();
+            currentTab = tab;
+            loadCurrentTab();
+        }
+
+        function loadCurrentTab() {
+            if (currentTab === 'niches') loadNiches();
+            if (currentTab === 'anomalies') loadAnomalies();
+            if (currentTab === 'keywords') loadKeywords();
         }
 
         async function fetchAPI(endpoint) {
-            const res = await fetch(`${API_URL}/${endpoint}`, {
+            const q = document.getElementById('search-input').value.trim();
+            const separator = endpoint.includes('?') ? '&' : '?';
+            const url = q ? `${API_URL}/${endpoint}${separator}q=${encodeURIComponent(q)}` : `${API_URL}/${endpoint}`;
+            const res = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${API_TOKEN}` }
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
+        }
+
+        function handleSearch(event) {
+            if (event.key === 'Enter') performSearch();
+        }
+
+        function performSearch() {
+            loadCurrentTab();
         }
 
         async function loadNiches() {
@@ -212,7 +244,7 @@ async def root():
                         <td>${Number(n.avg_views).toLocaleString()}</td>
                         <td>${Number(n.growth_rate).toLocaleString()}/dia</td>
                         <td><span class="badge badge-${n.competition_level}">${n.competition_level}</span></td>
-                        <td>${n.channel}</td>
+                        <td><a href="${n.channel_url || '#'}" target="_blank" class="channel-link">${n.channel}</a></td>
                     </tr>`;
                 });
                 html += '</tbody></table>';
@@ -233,7 +265,7 @@ async def root():
                 data.forEach(a => {
                     html += `<tr>
                         <td>${a.title}</td>
-                        <td>${a.channel_title}</td>
+                        <td><a href="${a.channel_url}" target="_blank" class="channel-link">${a.channel_title}</a></td>
                         <td>${Number(a.views).toLocaleString()}</td>
                         <td class="score">${a.anomaly_score}</td>
                         <td>${a.is_viral ? 'SIM' : 'nao'}</td>
@@ -272,19 +304,17 @@ async def root():
 
         function exportCSV(type) {
             const endpoint = type === 'niches' ? 'niches' : type === 'anomalies' ? 'anomalies' : 'keywords';
-            fetch(`${API_URL}/${endpoint}`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } })
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.length) return;
-                    const headers = Object.keys(data[0]);
-                    const csv = [headers.join(','), ...data.map(row => headers.map(h => `"${row[h] || ''}"`).join(','))].join('\\n');
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${type}.csv`;
-                    a.click();
-                });
+            fetchAPI(endpoint).then(data => {
+                if (!data.length) return;
+                const headers = Object.keys(data[0]);
+                const csv = [headers.join(','), ...data.map(row => headers.map(h => `"${row[h] || ''}"`).join(','))].join('\\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${type}.csv`;
+                a.click();
+            });
         }
 
         loadNiches();
@@ -295,15 +325,21 @@ async def root():
 
 
 @app.get("/niches")
-async def niches(token: str = Depends(verify_token)):
-    return JSONResponse(content=get_niches())
+async def niches(q: str = Query(default=""), token: str = Depends(verify_token)):
+    if q:
+        return JSONResponse(content=search_niches(q))
+    return JSONResponse(content=get_niches_with_url())
 
 
 @app.get("/anomalies")
-async def anomalies(token: str = Depends(verify_token)):
-    return JSONResponse(content=get_anomalies())
+async def anomalies(q: str = Query(default=""), token: str = Depends(verify_token)):
+    if q:
+        return JSONResponse(content=search_anomalies(q))
+    return JSONResponse(content=get_anomalies_with_url())
 
 
 @app.get("/keywords")
-async def keywords(token: str = Depends(verify_token)):
+async def keywords(q: str = Query(default=""), token: str = Depends(verify_token)):
+    if q:
+        return JSONResponse(content=search_keywords(q))
     return JSONResponse(content=get_keywords())
