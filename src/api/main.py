@@ -55,40 +55,242 @@ async def rate_limit_middleware(request: Request, call_next):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Minerador de Nichos</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
-            h1 { color: #ff0000; }
-            .endpoint { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
-            code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; }
-        </style>
-    </head>
-    <body>
-        <h1>Minerador de Nichos para YouTube</h1>
-        <p>API ativa. Use o token <code>dev-token-12345</code> no header Authorization.</p>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minerador de Nichos - YouTube</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #fff; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%); padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .header .status { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .status-dot { width: 8px; height: 8px; background: #00ff00; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #333; }
+        .tab { padding: 12px 24px; cursor: pointer; border: none; background: transparent; color: #aaa; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: #fff; }
+        .tab.active { color: #ff0000; border-bottom-color: #ff0000; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .card { background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #333; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-title { font-size: 18px; font-weight: 600; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+        .btn-primary { background: #ff0000; color: #fff; }
+        .btn-primary:hover { background: #cc0000; }
+        .btn-secondary { background: #333; color: #fff; }
+        .btn-secondary:hover { background: #444; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .stat-card { background: #1a1a1a; border-radius: 12px; padding: 20px; border: 1px solid #333; text-align: center; }
+        .stat-value { font-size: 32px; font-weight: 700; color: #ff0000; }
+        .stat-label { font-size: 12px; color: #aaa; margin-top: 4px; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        th { color: #aaa; font-weight: 500; font-size: 12px; text-transform: uppercase; }
+        td { font-size: 14px; }
+        tr:hover { background: #252525; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .badge-low { background: #00ff0022; color: #00ff00; }
+        .badge-medium { background: #ffaa0022; color: #ffaa00; }
+        .badge-high { background: #ff000022; color: #ff0000; }
+        .score { font-weight: 700; color: #ff0000; }
+        .loading { text-align: center; padding: 40px; color: #aaa; }
+        .error { background: #ff000022; color: #ff0000; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
+        .empty { text-align: center; padding: 40px; color: #666; }
+        .refresh-time { font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Minerador de Nichos</h1>
+        <div class="status">
+            <div class="status-dot"></div>
+            <span>API Online</span>
+        </div>
+    </div>
 
-        <div class="endpoint">
-            <h3>GET /niches</h3>
-            <p>Nichos identificados automaticamente</p>
-            <code>curl -H "Authorization: Bearer dev-token-12345" https://nicho-miner.onrender.com/niches</code>
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-niches">-</div>
+                <div class="stat-label">Nichos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-anomalies">-</div>
+                <div class="stat-label">Anomalias</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-keywords">-</div>
+                <div class="stat-label">Keywords</div>
+            </div>
         </div>
 
-        <div class="endpoint">
-            <h3>GET /anomalies</h3>
-            <p>Anomalias detectadas nos vídeos</p>
-            <code>curl -H "Authorization: Bearer dev-token-12345" https://nicho-miner.onrender.com/anomalies</code>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('niches')">Nichos</button>
+            <button class="tab" onclick="switchTab('anomalies')">Anomalias</button>
+            <button class="tab" onclick="switchTab('keywords')">Keywords</button>
         </div>
 
-        <div class="endpoint">
-            <h3>GET /keywords</h3>
-            <p>Palavras-chave extraídas dos títulos</p>
-            <code>curl -H "Authorization: Bearer dev-token-12345" https://nicho-miner.onrender.com/keywords</code>
+        <div id="tab-niches" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Nichos Identificados</div>
+                    <div>
+                        <button class="btn btn-secondary" onclick="exportCSV('niches')">Exportar CSV</button>
+                        <button class="btn btn-primary" onclick="loadNiches()">Atualizar</button>
+                    </div>
+                </div>
+                <div id="niches-content"><div class="loading">Carregando...</div></div>
+            </div>
         </div>
-    </body>
-    </html>
+
+        <div id="tab-anomalies" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Anomalias Detectadas</div>
+                    <div>
+                        <button class="btn btn-secondary" onclick="exportCSV('anomalies')">Exportar CSV</button>
+                        <button class="btn btn-primary" onclick="loadAnomalies()">Atualizar</button>
+                    </div>
+                </div>
+                <div id="anomalies-content"><div class="loading">Carregando...</div></div>
+            </div>
+        </div>
+
+        <div id="tab-keywords" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Palavras-chave Extraídas</div>
+                    <div>
+                        <button class="btn btn-secondary" onclick="exportCSV('keywords')">Exportar CSV</button>
+                        <button class="btn btn-primary" onclick="loadKeywords()">Atualizar</button>
+                    </div>
+                </div>
+                <div id="keywords-content"><div class="loading">Carregando...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_TOKEN = 'dev-token-12345';
+        const API_URL = window.location.origin;
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+            if (tab === 'niches') loadNiches();
+            if (tab === 'anomalies') loadAnomalies();
+            if (tab === 'keywords') loadKeywords();
+        }
+
+        async function fetchAPI(endpoint) {
+            const res = await fetch(`${API_URL}/${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+
+        async function loadNiches() {
+            const el = document.getElementById('niches-content');
+            el.innerHTML = '<div class="loading">Carregando...</div>';
+            try {
+                const data = await fetchAPI('niches');
+                document.getElementById('stat-niches').textContent = data.length;
+                if (!data.length) { el.innerHTML = '<div class="empty">Nenhum nicho encontrado</div>'; return; }
+                let html = '<table><thead><tr><th>Nicho</th><th>Score</th><th>Views</th><th>Crescimento</th><th>Concorrência</th><th>Canal</th></tr></thead><tbody>';
+                data.forEach(n => {
+                    html += `<tr>
+                        <td>${n.niche}</td>
+                        <td class="score">${n.anomaly_score}</td>
+                        <td>${Number(n.avg_views).toLocaleString()}</td>
+                        <td>${Number(n.growth_rate).toLocaleString()}/dia</td>
+                        <td><span class="badge badge-${n.competition_level}">${n.competition_level}</span></td>
+                        <td>${n.channel}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = `<div class="error">Erro: ${e.message}</div>`;
+            }
+        }
+
+        async function loadAnomalies() {
+            const el = document.getElementById('anomalies-content');
+            el.innerHTML = '<div class="loading">Carregando...</div>';
+            try {
+                const data = await fetchAPI('anomalies');
+                document.getElementById('stat-anomalies').textContent = data.length;
+                if (!data.length) { el.innerHTML = '<div class="empty">Nenhuma anomalia encontrada</div>'; return; }
+                let html = '<table><thead><tr><th>Vídeo</th><th>Canal</th><th>Views</th><th>Score</th><th>Viral</th><th>Crescimento</th><th>Concorrência</th></tr></thead><tbody>';
+                data.forEach(a => {
+                    html += `<tr>
+                        <td>${a.title}</td>
+                        <td>${a.channel_title}</td>
+                        <td>${Number(a.views).toLocaleString()}</td>
+                        <td class="score">${a.anomaly_score}</td>
+                        <td>${a.is_viral ? 'SIM' : 'nao'}</td>
+                        <td>${a.is_fast_growth ? 'SIM' : 'nao'}</td>
+                        <td>${a.is_low_competition ? 'SIM' : 'nao'}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = `<div class="error">Erro: ${e.message}</div>`;
+            }
+        }
+
+        async function loadKeywords() {
+            const el = document.getElementById('keywords-content');
+            el.innerHTML = '<div class="loading">Carregando...</div>';
+            try {
+                const data = await fetchAPI('keywords');
+                document.getElementById('stat-keywords').textContent = data.length;
+                if (!data.length) { el.innerHTML = '<div class="empty">Nenhuma keyword encontrada</div>'; return; }
+                let html = '<table><thead><tr><th>Keyword</th><th>Frequência</th><th>Peso</th></tr></thead><tbody>';
+                data.forEach(k => {
+                    html += `<tr>
+                        <td>${k.keyword}</td>
+                        <td>${k.frequency}</td>
+                        <td>${(k.weight * 100).toFixed(1)}%</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = `<div class="error">Erro: ${e.message}</div>`;
+            }
+        }
+
+        function exportCSV(type) {
+            const endpoint = type === 'niches' ? 'niches' : type === 'anomalies' ? 'anomalies' : 'keywords';
+            fetch(`${API_URL}/${endpoint}`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.length) return;
+                    const headers = Object.keys(data[0]);
+                    const csv = [headers.join(','), ...data.map(row => headers.map(h => `"${row[h] || ''}"`).join(','))].join('\\n');
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${type}.csv`;
+                    a.click();
+                });
+        }
+
+        loadNiches();
+    </script>
+</body>
+</html>
     """
 
 
