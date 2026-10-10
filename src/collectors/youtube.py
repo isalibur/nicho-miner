@@ -28,3 +28,19 @@ async def get_trending_videos(region: str = "US"):
         }
         async with session.get(BASE_URL + "/videos", params=params) as resp:
             return await resp.json()
+
+
+async def search_videos(query: str, max_results: int = 25):
+    if not YOUTUBE_API_KEY:
+        return {}
+    async with aiohttp.ClientSession() as session:
+        params = {
+            "part": "snippet",
+            "q": query,
+            "type": "video",
+            "maxResults": max_results,
+            "order": "relevance",
+            "key": YOUTUBE_API_KEY,
+        }
+        async with session.get(f"{BASE_URL}/search", params=params) as resp:
+            return await resp.json()

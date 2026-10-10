@@ -9,6 +9,7 @@ from src.db import (
     search_niches, search_anomalies, search_keywords,
     get_niches_with_url, get_anomalies_with_url,
 )
+from src.collectors.youtube import search_videos
 
 app = FastAPI(title="Minerador de Nichos API", version="2.0")
 
@@ -80,6 +81,11 @@ async def root():
         .search-input::placeholder { color: #666; }
         .channel-link { color: #ff0000; text-decoration: none; }
         .channel-link:hover { text-decoration: underline; }
+        .video-link { color: #4da6ff; text-decoration: none; }
+        .video-link:hover { text-decoration: underline; }
+        .source-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+        .source-local { background: #00ff0022; color: #00ff00; }
+        .source-youtube { background: #4da6ff22; color: #4da6ff; }
         .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #333; }
         .tab { padding: 12px 24px; cursor: pointer; border: none; background: transparent; color: #aaa; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
         .tab:hover { color: #fff; }
@@ -225,8 +231,41 @@ async def root():
             if (event.key === 'Enter') performSearch();
         }
 
-        function performSearch() {
-            loadCurrentTab();
+        async function performSearch() {
+            const q = document.getElementById('search-input').value.trim();
+            if (!q) { loadCurrentTab(); return; }
+
+            const localData = await fetchAPI(currentTab);
+            if (localData.length > 0) {
+                renderCurrentTab(localData);
+                return;
+            }
+
+            const el = document.getElementById(currentTab + '-content');
+            el.innerHTML = '<div class="loading">Buscando no YouTube...</div>';
+            try {
+                const ytData = await fetch(`${API_URL}/search-youtube?q=${encodeURIComponent(q)}`, {
+                    headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+                }).then(r => r.json());
+
+                if (!ytData.length) {
+                    el.innerHTML = '<div class="empty">Nenhum resultado encontrado</div>';
+                    return;
+                }
+
+                let html = '<table><thead><tr><th>Vídeo</th><th>Canal</th><th>Publicado</th></tr></thead><tbody>';
+                ytData.forEach(v => {
+                    html += `<tr>
+                        <td><a href="${v.video_url}" target="_blank" class="video-link">${v.title}</a><span class="source-badge source-youtube">YouTube</span></td>
+                        <td><a href="${v.channel_url}" target="_blank" class="channel-link">${v.channel_title}</a></td>
+                        <td>${new Date(v.published_at).toLocaleDateString()}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = `<div class="error">Erro: ${e.message}</div>`;
+            }
         }
 
         async function loadNiches() {
@@ -302,6 +341,96 @@ async def root():
             }
         }
 
+        async function performSearch() {
+            const q = document.getElementById('search-input').value.trim();
+            if (!q) { loadCurrentTab(); return; }
+
+            const localData = await fetchAPI(currentTab);
+            if (localData.length > 0) {
+                renderCurrentTab(localData);
+                return;
+            }
+
+            const el = document.getElementById(currentTab + '-content');
+            el.innerHTML = '<div class="loading">Buscando no YouTube...</div>';
+            try {
+                const ytData = await fetch(`${API_URL}/search-youtube?q=${encodeURIComponent(q)}`, {
+                    headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+                }).then(r => r.json());
+
+                if (!ytData.length) {
+                    el.innerHTML = '<div class="empty">Nenhum resultado encontrado</div>';
+                    return;
+                }
+
+                let html = '<table><thead><tr><th>Vídeo</th><th>Canal</th><th>Publicado</th></tr></thead><tbody>';
+                ytData.forEach(v => {
+                    html += `<tr>
+                        <td><a href="${v.video_url}" target="_blank" class="video-link">${v.title}</a><span class="source-badge source-youtube">YouTube</span></td>
+                        <td><a href="${v.channel_url}" target="_blank" class="channel-link">${v.channel_title}</a></td>
+                        <td>${new Date(v.published_at).toLocaleDateString()}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = `<div class="error">Erro: ${e.message}</div>`;
+            }
+        }
+
+        function renderCurrentTab(data) {
+            if (currentTab === 'niches') {
+                document.getElementById('stat-niches').textContent = data.length;
+                const el = document.getElementById('niches-content');
+                if (!data.length) { el.innerHTML = '<div class="empty">Nenhum nicho encontrado</div>'; return; }
+                let html = '<table><thead><tr><th>Nicho</th><th>Score</th><th>Views</th><th>Crescimento</th><th>Concorrência</th><th>Canal</th></tr></thead><tbody>';
+                data.forEach(n => {
+                    html += `<tr>
+                        <td>${n.niche}</td>
+                        <td class="score">${n.anomaly_score}</td>
+                        <td>${Number(n.avg_views).toLocaleString()}</td>
+                        <td>${Number(n.growth_rate).toLocaleString()}/dia</td>
+                        <td><span class="badge badge-${n.competition_level}">${n.competition_level}</span></td>
+                        <td><a href="${n.channel_url || '#'}" target="_blank" class="channel-link">${n.channel}</a></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } else if (currentTab === 'anomalies') {
+                document.getElementById('stat-anomalies').textContent = data.length;
+                const el = document.getElementById('anomalies-content');
+                if (!data.length) { el.innerHTML = '<div class="empty">Nenhuma anomalia encontrada</div>'; return; }
+                let html = '<table><thead><tr><th>Vídeo</th><th>Canal</th><th>Views</th><th>Score</th><th>Viral</th><th>Crescimento</th><th>Concorrência</th></tr></thead><tbody>';
+                data.forEach(a => {
+                    html += `<tr>
+                        <td>${a.title}</td>
+                        <td><a href="${a.channel_url}" target="_blank" class="channel-link">${a.channel_title}</a></td>
+                        <td>${Number(a.views).toLocaleString()}</td>
+                        <td class="score">${a.anomaly_score}</td>
+                        <td>${a.is_viral ? 'SIM' : 'nao'}</td>
+                        <td>${a.is_fast_growth ? 'SIM' : 'nao'}</td>
+                        <td>${a.is_low_competition ? 'SIM' : 'nao'}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } else {
+                document.getElementById('stat-keywords').textContent = data.length;
+                const el = document.getElementById('keywords-content');
+                if (!data.length) { el.innerHTML = '<div class="empty">Nenhuma keyword encontrada</div>'; return; }
+                let html = '<table><thead><tr><th>Keyword</th><th>Frequência</th><th>Peso</th></tr></thead><tbody>';
+                data.forEach(k => {
+                    html += `<tr>
+                        <td>${k.keyword}</td>
+                        <td>${k.frequency}</td>
+                        <td>${(k.weight * 100).toFixed(1)}%</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            }
+        }
+
         function exportCSV(type) {
             const endpoint = type === 'niches' ? 'niches' : type === 'anomalies' ? 'anomalies' : 'keywords';
             fetchAPI(endpoint).then(data => {
@@ -343,3 +472,24 @@ async def keywords(q: str = Query(default=""), token: str = Depends(verify_token
     if q:
         return JSONResponse(content=search_keywords(q))
     return JSONResponse(content=get_keywords())
+
+
+@app.get("/search-youtube")
+async def search_youtube(q: str = Query(...), token: str = Depends(verify_token)):
+    result = await search_videos(q)
+    items = result.get("items", [])
+    videos = []
+    for item in items:
+        snippet = item.get("snippet", {})
+        video_id = item.get("id", {}).get("videoId", "")
+        channel_id = snippet.get("channelId", "")
+        videos.append({
+            "video_id": video_id,
+            "title": snippet.get("title", ""),
+            "channel_id": channel_id,
+            "channel_title": snippet.get("channelTitle", ""),
+            "channel_url": f"https://youtube.com/channel/{channel_id}",
+            "video_url": f"https://youtube.com/watch?v={video_id}",
+            "published_at": snippet.get("publishedAt", ""),
+        })
+    return JSONResponse(content=videos)
