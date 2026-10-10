@@ -7,38 +7,208 @@ import aiohttp
 import pandas as pd
 
 from ..config import YOUTUBE_API_KEY
-from .youtube import get_trending_videos
+from .youtube import get_trending_videos, search_videos
 
 BASE_URL = "https://www.googleapis.com/youtube/v3"
 
 STOPWORDS = {
-    "a", "o", "e", "de", "do", "da", "em", "um", "uma", "para", "com", "no", "na",
-    "os", "as", "dos", "das", "que", "se", "por", "the", "and", "is", "in", "on",
-    "at", "to", "of", "for", "an", "as", "this", "that", "it", "be", "are", "was",
-    "como", "você", "seu", "sua", "meu", "minha", "nos", "nós", "lhe", "ele", "ela",
-    "eles", "elas", "eu", "tu", "me", "te", "lhe", "nos", "vos", "lhes", "que", "qual",
-    "quais", "onde", "quando", "porque", "pois", "mas", "ou", "nem", "já", "também",
-    "só", "após", "antes", "entre", "sobre", "até", "desde", "contra", "perante",
-    "video", "vídeo", "youtube", "canal", "inscreva", "like", "compartilhe", "deixa",
-    "deixe", "veja", "vejam", "assista", "assistam", "clique", "cliquem", "link",
-    "links", "descrição", "descrições", "comentário", "comentários", "comente",
-    "comentem", "compartilhe", "compartilhem", "inscreva-se", "inscrevam-se",
-    "ative", "ativem", "sininho", "sino", "notificação", "notificações", "grátis",
-    "grátis", "gratuito", "gratuita", "promoção", "promoções", "oferta", "ofertas",
-    "desconto", "descontos", "cupom", "cupons", "cupom", "cupons", "brinde", "brindes",
-    "sorteio", "sorteios", "ganhe", "ganhem", "ganhar", "ganhe", "prêmio", "prêmios",
-    "concurso", "concurso", "participe", "participem", "participação", "participações",
-    "live", "ao", "vivo", "estreia", "estreias", "lançamento", "lançamentos", "novo",
-    "novos", "nova", "novas", "atualização", "atualizações", "update", "updates",
-    "tutorial", "tutoriais", "dica", "dicas", "truque", "truques", "segredo", "segredos",
-    "erro", "erros", "problema", "problemas", "solução", "soluções", "resposta",
-    "respostas", "pergunta", "perguntas", "resposta", "respostas", "comentário",
-    "comentários", "comente", "comentem", "compartilhe", "compartilhem", "inscreva-se",
-    "inscrevam-se", "ative", "ativem", "sininho", "sino", "notificação", "notificações",
+    "a",
+    "o",
+    "e",
+    "de",
+    "do",
+    "da",
+    "em",
+    "um",
+    "uma",
+    "para",
+    "com",
+    "no",
+    "na",
+    "os",
+    "as",
+    "dos",
+    "das",
+    "que",
+    "se",
+    "por",
+    "the",
+    "and",
+    "is",
+    "in",
+    "on",
+    "at",
+    "to",
+    "of",
+    "for",
+    "an",
+    "as",
+    "this",
+    "that",
+    "it",
+    "be",
+    "are",
+    "was",
+    "como",
+    "você",
+    "seu",
+    "sua",
+    "meu",
+    "minha",
+    "nos",
+    "nós",
+    "lhe",
+    "ele",
+    "ela",
+    "eles",
+    "elas",
+    "eu",
+    "tu",
+    "me",
+    "te",
+    "lhe",
+    "nos",
+    "vos",
+    "lhes",
+    "que",
+    "qual",
+    "quais",
+    "onde",
+    "quando",
+    "porque",
+    "pois",
+    "mas",
+    "ou",
+    "nem",
+    "já",
+    "também",
+    "só",
+    "após",
+    "antes",
+    "entre",
+    "sobre",
+    "até",
+    "desde",
+    "contra",
+    "perante",
+    "video",
+    "vídeo",
+    "youtube",
+    "canal",
+    "inscreva",
+    "like",
+    "compartilhe",
+    "deixa",
+    "deixe",
+    "veja",
+    "vejam",
+    "assista",
+    "assistam",
+    "clique",
+    "cliquem",
+    "link",
+    "links",
+    "descrição",
+    "descrições",
+    "comentário",
+    "comentários",
+    "comente",
+    "comentem",
+    "compartilhe",
+    "compartilhem",
+    "inscreva-se",
+    "inscrevam-se",
+    "ative",
+    "ativem",
+    "sininho",
+    "sino",
+    "notificação",
+    "notificações",
+    "grátis",
+    "grátis",
+    "gratuito",
+    "gratuita",
+    "promoção",
+    "promoções",
+    "oferta",
+    "ofertas",
+    "desconto",
+    "descontos",
+    "cupom",
+    "cupons",
+    "cupom",
+    "cupons",
+    "brinde",
+    "brindes",
+    "sorteio",
+    "sorteios",
+    "ganhe",
+    "ganhem",
+    "ganhar",
+    "ganhe",
+    "prêmio",
+    "prêmios",
+    "concurso",
+    "concurso",
+    "participe",
+    "participem",
+    "participação",
+    "participações",
+    "live",
+    "ao",
+    "vivo",
+    "estreia",
+    "estreias",
+    "lançamento",
+    "lançamentos",
+    "novo",
+    "novos",
+    "nova",
+    "novas",
+    "atualização",
+    "atualizações",
+    "update",
+    "updates",
+    "tutorial",
+    "tutoriais",
+    "dica",
+    "dicas",
+    "truque",
+    "truques",
+    "segredo",
+    "segredos",
+    "erro",
+    "erros",
+    "problema",
+    "problemas",
+    "solução",
+    "soluções",
+    "resposta",
+    "respostas",
+    "pergunta",
+    "perguntas",
+    "resposta",
+    "respostas",
+    "comentário",
+    "comentários",
+    "comente",
+    "comentem",
+    "compartilhe",
+    "compartilhem",
+    "inscreva-se",
+    "inscrevam-se",
+    "ative",
+    "ativem",
+    "sininho",
+    "sino",
+    "notificação",
+    "notificações",
 }
 
 
-async def get_channel_id_from_video(video_id: str, session: aiohttp.ClientSession) -> str | None:
+async def get_channel_id_from_video(
+    video_id: str, session: aiohttp.ClientSession
+) -> str | None:
     params = {
         "part": "snippet",
         "id": video_id,
@@ -127,9 +297,6 @@ def calculate_anomalies(videos: list[dict]) -> list[dict]:
     df = pd.DataFrame(videos)
     mean_views = df["views"].mean()
     median_views = df["views"].median()
-    q1 = df["views"].quantile(0.25)
-    q3 = df["views"].quantile(0.75)
-    iqr = q3 - q1
 
     df["views_per_day"] = df["views"] / df["days_since_published"]
     df["engagement_ratio"] = df["views"] / (df["comments"] + 1)
@@ -156,7 +323,9 @@ def calculate_anomalies(videos: list[dict]) -> list[dict]:
                     "channel_id": row["channel_id"],
                     "channel_title": row["channel_title"],
                     "views": row["views"],
-                    "z_score": round((row["views"] - mean_views) / (df["views"].std() or 1), 2),
+                    "z_score": round(
+                        (row["views"] - mean_views) / (df["views"].std() or 1), 2
+                    ),
                     "views_per_day": round(row["views_per_day"], 2),
                     "engagement_ratio": round(row["engagement_ratio"], 2),
                     "anomaly_score": anomaly_score,
@@ -184,9 +353,124 @@ def extract_niche_keywords(titles: list[str], top_n: int = 10) -> list[dict]:
     ]
 
 
-async def find_anomalous_niches(
-    region: str = "US", max_channels: int = 20
+async def get_channel_stats(channel_id: str, session: aiohttp.ClientSession) -> dict:
+    params = {
+        "part": "snippet,statistics",
+        "id": channel_id,
+        "key": YOUTUBE_API_KEY,
+    }
+    async with session.get(f"{BASE_URL}/channels", params=params) as resp:
+        data = await resp.json()
+        items = data.get("items", [])
+        if not items:
+            return {}
+        item = items[0]
+        stats = item.get("statistics", {})
+        snippet = item.get("snippet", {})
+        created = snippet.get("publishedAt", "")
+        age_days = 90
+        if created:
+            try:
+                created_date = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                age_days = (datetime.now(timezone.utc) - created_date).days
+            except ValueError:
+                pass
+        return {
+            "channel_id": channel_id,
+            "title": snippet.get("title", ""),
+            "created_at": created,
+            "age_days": age_days,
+            "subscribers": int(stats.get("subscriberCount", 0)),
+            "video_count": int(stats.get("videoCount", 0)),
+            "view_count": int(stats.get("viewCount", 0)),
+        }
+
+
+async def find_deep_niches(
+    query: str = "",
+    max_results: int = 20,
 ) -> dict:
+    if not YOUTUBE_API_KEY:
+        return {"niches": [], "anomalies": [], "keywords": [], "channels": []}
+
+    search_query = query if query else "new channel 2024"
+    search_data = await search_videos(search_query, max_results=50)
+    items = search_data.get("items", [])
+
+    channel_ids = []
+    for item in items:
+        channel_id = item.get("snippet", {}).get("channelId")
+        if channel_id and channel_id not in channel_ids:
+            channel_ids.append(channel_id)
+
+    filtered_channels = []
+    all_anomalies = []
+    all_titles = []
+
+    async with aiohttp.ClientSession() as session:
+        stats_tasks = [get_channel_stats(ch_id, session) for ch_id in channel_ids[:30]]
+        stats_results = await asyncio.gather(*stats_tasks, return_exceptions=True)
+
+        for stats in stats_results:
+            if isinstance(stats, Exception) or not stats:
+                continue
+            is_new = stats["age_days"] <= 90
+            is_small = 5000 <= stats["subscribers"] <= 15000
+            is_few_videos = stats["video_count"] < 10
+            if is_new and is_small and is_few_videos:
+                filtered_channels.append(stats)
+
+        video_tasks = [
+            get_channel_videos(ch["channel_id"], session=session)
+            for ch in filtered_channels
+        ]
+        video_results = await asyncio.gather(*video_tasks, return_exceptions=True)
+
+        for ch, videos in zip(filtered_channels, video_results):
+            if isinstance(videos, Exception) or not videos:
+                continue
+            all_titles.extend([v["title"] for v in videos])
+            anomalies = calculate_anomalies(videos)
+            for a in anomalies:
+                a["channel_id"] = ch["channel_id"]
+                a["channel_title"] = ch["title"]
+            all_anomalies.extend(anomalies)
+
+    all_anomalies.sort(key=lambda x: x["anomaly_score"], reverse=True)
+    keywords = extract_niche_keywords(all_titles)
+
+    niches = []
+    seen_keywords = set()
+    for anomaly in all_anomalies[:50]:
+        title_words = re.findall(r"\b[a-zA-ZÀ-ÿ]{3,}\b", anomaly["title"].lower())
+        niche_words = [w for w in title_words if w not in STOPWORDS]
+        niche_key = " ".join(sorted(set(niche_words[:3])))
+
+        if niche_key and niche_key not in seen_keywords:
+            seen_keywords.add(niche_key)
+            niches.append(
+                {
+                    "niche": niche_key,
+                    "anomaly_score": anomaly["anomaly_score"],
+                    "avg_views": anomaly["views"],
+                    "growth_rate": anomaly["views_per_day"],
+                    "competition_level": (
+                        "low" if anomaly["is_low_competition"] else "medium"
+                    ),
+                    "source_video": anomaly["title"],
+                    "channel": anomaly["channel_title"],
+                }
+            )
+
+    return {
+        "niches": niches[:20],
+        "anomalies": all_anomalies[:50],
+        "keywords": keywords,
+        "channels": filtered_channels,
+    }
+
+
+async def find_anomalous_niches(region: str = "US", max_channels: int = 20) -> dict:
     if not YOUTUBE_API_KEY:
         return {"niches": [], "anomalies": [], "keywords": []}
 
@@ -205,9 +489,7 @@ async def find_anomalous_niches(
     all_titles = []
 
     async with aiohttp.ClientSession() as session:
-        tasks = [
-            get_channel_videos(ch_id, session=session) for ch_id in channel_ids
-        ]
+        tasks = [get_channel_videos(ch_id, session=session) for ch_id in channel_ids]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for videos in results:
@@ -235,7 +517,9 @@ async def find_anomalous_niches(
                     "anomaly_score": anomaly["anomaly_score"],
                     "avg_views": anomaly["views"],
                     "growth_rate": anomaly["views_per_day"],
-                    "competition_level": "low" if anomaly["is_low_competition"] else "medium",
+                    "competition_level": (
+                        "low" if anomaly["is_low_competition"] else "medium"
+                    ),
                     "source_video": anomaly["title"],
                     "channel": anomaly["channel_title"],
                 }

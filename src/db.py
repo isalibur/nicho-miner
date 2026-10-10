@@ -75,9 +75,18 @@ def save_anomalies(anomalies: list[dict]):
                 engagement_ratio, anomaly_score, is_viral, is_fast_growth, is_low_competition)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                a["video_id"], a["title"], a["channel_id"], a["channel_title"],
-                a["views"], a["z_score"], a["views_per_day"], a["engagement_ratio"],
-                a["anomaly_score"], a["is_viral"], a["is_fast_growth"], a["is_low_competition"],
+                a["video_id"],
+                a["title"],
+                a["channel_id"],
+                a["channel_title"],
+                a["views"],
+                a["z_score"],
+                a["views_per_day"],
+                a["engagement_ratio"],
+                a["anomaly_score"],
+                a["is_viral"],
+                a["is_fast_growth"],
+                a["is_low_competition"],
             ),
         )
     conn.commit()
@@ -98,7 +107,8 @@ def save_keywords(keywords: list[dict]):
 def get_niches(limit: int = 20) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(
-        "SELECT * FROM niches ORDER BY anomaly_score DESC, avg_views DESC LIMIT ?", (limit,)
+        "SELECT * FROM niches ORDER BY anomaly_score DESC, avg_views DESC LIMIT ?",
+        (limit,),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -133,7 +143,7 @@ def search_niches(query: str, limit: int = 20) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(
         "SELECT * FROM niches WHERE niche LIKE ? OR channel LIKE ? ORDER BY anomaly_score DESC LIMIT ?",
-        (f"%{query}%", f"%{query}%", limit)
+        (f"%{query}%", f"%{query}%", limit),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -143,7 +153,7 @@ def search_anomalies(query: str, limit: int = 50) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(
         "SELECT * FROM anomalies WHERE title LIKE ? OR channel_title LIKE ? ORDER BY anomaly_score DESC LIMIT ?",
-        (f"%{query}%", f"%{query}%", limit)
+        (f"%{query}%", f"%{query}%", limit),
     ).fetchall()
     conn.close()
     result = []
@@ -161,7 +171,7 @@ def search_keywords(query: str, limit: int = 10) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(
         "SELECT * FROM keywords WHERE keyword LIKE ? ORDER BY frequency DESC LIMIT ?",
-        (f"%{query}%", limit)
+        (f"%{query}%", limit),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -170,13 +180,18 @@ def search_keywords(query: str, limit: int = 10) -> list[dict]:
 def get_niches_with_url(limit: int = 20) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(
-        "SELECT * FROM niches ORDER BY anomaly_score DESC, avg_views DESC LIMIT ?", (limit,)
+        "SELECT * FROM niches ORDER BY anomaly_score DESC, avg_views DESC LIMIT ?",
+        (limit,),
     ).fetchall()
     conn.close()
     result = []
     for r in rows:
         d = dict(r)
-        d["channel_url"] = f"https://youtube.com/@{d['channel'].replace(' ', '')}" if d.get('channel') else ""
+        d["channel_url"] = (
+            f"https://youtube.com/@{d['channel'].replace(' ', '')}"
+            if d.get("channel")
+            else ""
+        )
         result.append(d)
     return result
 

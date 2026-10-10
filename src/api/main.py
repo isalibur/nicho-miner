@@ -5,11 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import time
 import os
 from src.db import (
-    init_db, get_niches, get_anomalies, get_keywords,
-    search_niches, search_anomalies, search_keywords,
-    get_niches_with_url, get_anomalies_with_url,
+    init_db,
+    get_keywords,
+    search_niches,
+    search_anomalies,
+    search_keywords,
+    get_niches_with_url,
+    get_anomalies_with_url,
 )
 from src.collectors.youtube import search_videos
+from src.collectors.anomaly import find_deep_niches
 
 app = FastAPI(title="Minerador de Nichos API", version="2.0")
 
@@ -79,6 +84,11 @@ async def root():
         .search-input { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #333; background: #1a1a1a; color: #fff; font-size: 14px; outline: none; }
         .search-input:focus { border-color: #ff0000; }
         .search-input::placeholder { color: #666; }
+        .deep-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; cursor: pointer; }
+        .deep-toggle input { accent-color: #ff0000; }
+        .deep-toggle label { color: #aaa; font-size: 13px; cursor: pointer; }
+        .deep-toggle.active { border-color: #ff0000; background: #ff000022; }
+        .deep-toggle.active label { color: #ff0000; }
         .channel-link { color: #ff0000; text-decoration: none; }
         .channel-link:hover { text-decoration: underline; }
         .video-link { color: #4da6ff; text-decoration: none; }
@@ -132,6 +142,10 @@ async def root():
     <div class="container">
         <div class="search-bar">
             <input type="text" class="search-input" id="search-input" placeholder="Buscar por termo, nicho ou canal..." onkeyup="handleSearch(event)">
+            <div class="deep-toggle" id="deep-toggle" onclick="toggleDeepSearch()">
+                <input type="checkbox" id="deep-search-checkbox">
+                <label for="deep-search-checkbox">Busca Profunda</label>
+            </div>
             <button class="btn btn-primary" onclick="performSearch()">Buscar</button>
         </div>
 
@@ -216,10 +230,29 @@ async def root():
             if (currentTab === 'keywords') loadKeywords();
         }
 
+        function toggleDeepSearch() {
+            document.getElementById('deep-toggle').classList.toggle('active');
+        }
+
+        function isDeepSearch() {
+            return document.getElementById('deep-search-checkbox').checked;
+        }
+
         async function fetchAPI(endpoint) {
             const q = document.getElementById('search-input').value.trim();
             const separator = endpoint.includes('?') ? '&' : '?';
             const url = q ? `${API_URL}/${endpoint}${separator}q=${encodeURIComponent(q)}` : `${API_URL}/${endpoint}`;
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+
+        async function fetchDeepSearch() {
+            const q = document.getElementById('search-input').value.trim();
+            const separator = '?';
+            const url = q ? `${API_URL}/deep-search${separator}q=${encodeURIComponent(q)}` : `${API_URL}/deep-search`;
             const res = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${API_TOKEN}` }
             });
@@ -234,6 +267,23 @@ async def root():
         async function performSearch() {
             const q = document.getElementById('search-input').value.trim();
             if (!q) { loadCurrentTab(); return; }
+
+            if (isDeepSearch()) {
+                const el = document.getElementById(currentTab + '-content');
+                el.innerHTML = '<div class="loading">Busca profunda em andamento...</div>';
+                try {
+                    const deepData = await fetchDeepSearch();
+                    const items = currentTab === 'niches' ? deepData.niches : currentTab === 'anomalies' ? deepData.anomalies : deepData.keywords;
+                    if (items && items.length > 0) {
+                        renderCurrentTab(items);
+                    } else {
+                        el.innerHTML = '<div class="empty">Nenhum resultado encontrado na busca profunda</div>';
+                    }
+                } catch (e) {
+                    el.innerHTML = `<div class="error">Erro: ${e.message}</div>`;
+                }
+                return;
+            }
 
             const localData = await fetchAPI(currentTab);
             if (localData.length > 0) {
@@ -483,13 +533,35 @@ async def search_youtube(q: str = Query(...), token: str = Depends(verify_token)
         snippet = item.get("snippet", {})
         video_id = item.get("id", {}).get("videoId", "")
         channel_id = snippet.get("channelId", "")
-        videos.append({
-            "video_id": video_id,
-            "title": snippet.get("title", ""),
-            "channel_id": channel_id,
-            "channel_title": snippet.get("channelTitle", ""),
-            "channel_url": f"https://youtube.com/channel/{channel_id}",
-            "video_url": f"https://youtube.com/watch?v={video_id}",
-            "published_at": snippet.get("publishedAt", ""),
-        })
+        videos.append(
+            {
+                "video_id": video_id,
+                "title": snippet.get("title", ""),
+                "channel_id": channel_id,
+                "channel_title": snippet.get("channelTitle", ""),
+                "channel_url": f"https://youtube.com/channel/{channel_id}",
+                "video_url": f"https://youtube.com/watch?v={video_id}",
+                "published_at": snippet.get("publishedAt", ""),
+            }
+        )
     return JSONResponse(content=videos)
+
+
+@app.get("/deep-search")
+async def deep_search(
+    q: str = Query(default=""),
+    max_results: int = Query(default=20, ge=1, le=100),
+    token: str = Depends(verify_token),
+):
+    result = await find_deep_niches(query=q, max_results=max_results)
+    channels = result.get("channels", [])
+    for ch in channels:
+        ch["channel_url"] = f"https://youtube.com/channel/{ch['channel_id']}"
+    return JSONResponse(
+        content={
+            "niches": result["niches"],
+            "anomalies": result["anomalies"],
+            "keywords": result["keywords"],
+            "channels": channels,
+        }
+    )
